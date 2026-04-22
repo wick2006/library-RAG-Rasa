@@ -55,6 +55,13 @@ docker run \
     -e NEO4J_AUTH=neo4j/12345678 \
     neo4j:latest
 ```
+
+不使用docker：
+```bash
+cd neo4j-community-4.4.3/bin
+./neo4j console
+```
+
 * **可视化界面**: 浏览器访问 `http://localhost:7474` (账号 `neo4j` / 密码 `12345678`)
 * **程序连接端口**: `7687`
 
