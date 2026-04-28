@@ -1,6 +1,7 @@
 from typing import Any, Text, Dict, List
 from rasa_sdk import Action, Tracker
 from rasa_sdk.executor import CollectingDispatcher
+from rasa_sdk.events import SlotSet
 
 # 引入刚才写的两个自定义模块
 from actions.neo4j_connector import get_books_by_topic
@@ -42,4 +43,4 @@ class ActionRecommendByTopic(Action):
         # 5. 把大模型生成的最终回复发给用户
         dispatcher.utter_message(text=reply)
 
-        return []
+        return [SlotSet("topic", None)]  # 用完就丢，清空这个槽位，准备下一轮对话
