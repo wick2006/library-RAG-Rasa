@@ -1,144 +1,45 @@
 from typing import Any, Text, Dict, List
 from rasa_sdk import Action, Tracker
 from rasa_sdk.executor import CollectingDispatcher
-from rasa_sdk.events import SlotSet, AllSlotsReset, ActiveLoop
-from rasa_sdk.forms import FormValidationAction
 
+# 引入刚才写的两个自定义模块
+from actions.neo4j_connector import get_books_by_topic
+from actions.llm_server import generate_ollama_reply
 
-### -------------- 挂号意图 ----------------------
+class ActionRecommendByTopic(Action):
 
-class ValidateRegisterForm(FormValidationAction):
     def name(self) -> Text:
-        return "validate_register_form"
+        # 这个名字必须和 domain.yml 中 actions 列表下的名字一模一样
+        return "action_recommend_by_topic"
 
-class ActionRegisterFormSubmit(Action):
-    def name(self) -> Text:
-        return "action_register_form_submit"
+    def run(self, dispatcher: CollectingDispatcher,
+            tracker: Tracker,
+            domain: Dict[Text, Any]) -> List[Dict[Text, Any]]:
 
-    def run(self, dispatcher, tracker, domain):
-        # 表单填完后统一提示确认
-        dispatcher.utter_message(
-            response="utter_ask_register_confirm", **tracker.slots
-        )
-
-        return []
-
-
-class ActionRegister(Action):
-    def name(self) -> Text:
-        return "action_register"
-
-    def run(
-        self,
-        dispatcher: CollectingDispatcher,
-        tracker: Tracker,
-        domain: Dict[Text, Any],
-    ) -> List[Dict[Text, Any]]:
-        api_succeed = tracker.get_slot("person_doctor") == "李医生"
-
-        return [AllSlotsReset(), SlotSet("api_register_succeed", api_succeed), ActiveLoop(None)]
-
-
-### -------------- 查询排班意图 ----------------------
-
-class ValidateQueryDoctorForm(FormValidationAction):
-    def name(self) -> Text:
-        return "validate_query_doctor_form"
-
-class ActionQueryDoctorFormSubmit(Action):
-    def name(self) -> Text:
-        return "action_query_doctor_form_submit"
-
-    def run(self, dispatcher, tracker, domain):
-        # 表单填完后统一提示确认
-        dispatcher.utter_message(
-            response="utter_ask_query_doctor_confirm", **tracker.slots
-        )
-        return []
-
-
-class ActionQueryDoctor(Action):
-    def name(self) -> Text:
-        return "action_query_doctor"
-
-    def run(
-        self,
-        dispatcher: CollectingDispatcher,
-        tracker: Tracker,
-        domain: Dict[Text, Any],
-    ) -> List[Dict[Text, Any]]:
-        doctor = tracker.get_slot("person_doctor")
-        department = tracker.get_slot("department")
-        date = tracker.get_slot("date")
-        api_succeed = (doctor == "李医生" and department == "内科" and date == "本周")
-
-        return [AllSlotsReset(), SlotSet("api_query_doctor_succeed", api_succeed), ActiveLoop(None)]
-
-
-### -------------- 缴费意图 ----------------------
-
-class ValidatePayForm(FormValidationAction):
-    def name(self) -> Text:
-        return "validate_pay_form"
-
-class ActionPayFormSubmit(Action):
-    def name(self) -> Text:
-        return "action_pay_form_submit"
-
-    def run(self, dispatcher, tracker, domain):
-        # 表单填完后统一提示确认
-        dispatcher.utter_message(
-            response="utter_ask_pay_confirm", **tracker.slots
-        )
-        return []
-
-
-class ActionPay(Action):
-    def name(self) -> Text:
-        return "action_pay"
-
-    def run(
-        self,
-        dispatcher: CollectingDispatcher,
-        tracker: Tracker,
-        domain: Dict[Text, Any],
-    ) -> List[Dict[Text, Any]]:
-        api_succeed = tracker.get_slot("payment") == "支付宝"       
+        # 1. 从对话上下文中获取 Rasa NLU 提取到的 topic 实体
+        topic = tracker.get_slot("topic")
         
-        return [AllSlotsReset(), SlotSet("api_pay_succeed", api_succeed), ActiveLoop(None)]
+        # 兜底逻辑：如果没有识别到 topic
+        if not topic:
+            dispatcher.utter_message(text="抱歉，我没有听清你想看哪个研究方向的书，能具体说说吗？例如：'我想看人工智能方向的。'")
+            return []
 
+        # 给用户一个正在处理的反馈
+        dispatcher.utter_message(text=f"好的，正在知识图谱中为您检索【{topic}】方向的藏书，请稍候...")
 
+        # 2. 调用 Neo4j 图谱查询数据
+        kg_results = get_books_by_topic(topic)
 
-### -------------- 查询症状意图 ----------------------
+        # 3. 兜底逻辑：如果图谱里查不到这个方向的书
+        if not kg_results:
+            dispatcher.utter_message(text=f"很遗憾，我们馆内目前还没有关于【{topic}】方向的专门藏书，要不换个方向试试？")
+            return []
 
-class ValidateQuerysymptomForm(FormValidationAction):
-    def name(self) -> Text:
-        return "validate_query_symptom_form"
+        # 4. 如果查到了数据，交给 Ollama 生成自然语言回复
+        print(f"--- 准备提交给 LLM 的数据: {kg_results} ---") 
+        reply = generate_ollama_reply(topic, kg_results)
 
-class ActionQuerysymptomFormSubmit(Action):
-    def name(self) -> Text:
-        return "action_query_symptom_form_submit"
+        # 5. 把大模型生成的最终回复发给用户
+        dispatcher.utter_message(text=reply)
 
-    def run(self, dispatcher, tracker, domain):
-        # 表单填完后统一提示确认
-        dispatcher.utter_message(
-            response="utter_ask_query_symptom_confirm", **tracker.slots
-        )
         return []
-
-
-class ActionQuerysymptom(Action):
-    def name(self) -> Text:
-        return "action_query_symptom"
-
-    def run(
-        self,
-        dispatcher: CollectingDispatcher,
-        tracker: Tracker,
-        domain: Dict[Text, Any],
-    ) -> List[Dict[Text, Any]]:
-        symptom = tracker.get_slot("symptom")
-        api_succeed = symptom == "咳嗽"
-        
-        return [AllSlotsReset(), SlotSet("api_query_symptom_succeed", api_succeed), ActiveLoop(None)]
-
