@@ -46,7 +46,37 @@ def import_csv_to_neo4j(csv_file_path):
                 
     driver.close()
     print(f"\n导入完成！共成功处理 {success_count} 本书籍。")
+# 1. 导入作者详细信息
+IMPORT_AUTHORS_CYPHER = """
+MERGE (a:Author {name: $name})
+SET a.primary_field = $primary_field, a.bio = $bio
+"""
 
+# 2. 建立作者间的联系
+IMPORT_AUTHOR_REL_CYPHER = """
+MATCH (a1:Author {name: $source})
+MATCH (a2:Author {name: $target})
+MERGE (a1)-[r:RELATION_PLACEHOLDER]->(a2)
+""".replace("RELATION_PLACEHOLDER", "$rel_type") # 动态替换关系类型
+
+def import_extended_data():
+    driver = GraphDatabase.driver(URI, auth=(USER, PASSWORD))
+    with driver.session() as session:
+        # 处理 authors.csv
+        with open('kg_module/raw_data/authors.csv', 'r', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                session.run(IMPORT_AUTHORS_CYPHER, name=row['name'], primary_field=row['primary_field'], bio=row['bio'])
+        
+        # 处理 author_relations.csv
+        with open('kg_module/raw_data/author_relations.csv', 'r', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                # 注意：关系类型需要动态拼装
+                query = f"MATCH (a1:Author {{name: $s}}), (a2:Author {{name: $t}}) MERGE (a1)-[:{row['relation_type']}]->(a2)"
+                session.run(query, s=row['source_author'], t=row['target_author'])
+    driver.close()
+    
 if __name__ == "__main__":
     # 获取当前脚本所在目录，拼接 csv 的绝对路径
     current_dir = os.path.dirname(os.path.abspath(__file__))

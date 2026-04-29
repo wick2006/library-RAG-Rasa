@@ -3,9 +3,10 @@ from rasa_sdk import Action, Tracker
 from rasa_sdk.executor import CollectingDispatcher
 from rasa_sdk.events import SlotSet
 
-# 引入刚才写的两个自定义模块
-from actions.neo4j_connector import get_books_by_topic
-from actions.llm_server import generate_ollama_reply
+# 引入查询书籍和作者
+from actions.neo4j_connector import get_books_by_topic, get_author_profile
+from actions.llm_server import generate_ollama_reply, generate_author_reply
+
 
 class ActionRecommendByTopic(Action):
 
@@ -44,3 +45,38 @@ class ActionRecommendByTopic(Action):
         dispatcher.utter_message(text=reply)
 
         return [SlotSet("topic", None)]  # 用完就丢，清空这个槽位，准备下一轮对话
+
+class ActionIntroduceAuthor(Action):
+
+    def name(self) -> Text:
+        return "action_introduce_author"
+
+    def run(self, dispatcher: CollectingDispatcher,
+            tracker: Tracker,
+            domain: Dict[Text, Any]) -> List[Dict[Text, Any]]:
+
+        # 1. 提取作者实体
+        author = tracker.get_slot("author")
+        
+        if not author:
+            dispatcher.utter_message(text="请问你想了解哪位作者？可以告诉我他/她的名字。")
+            return []
+
+        dispatcher.utter_message(text=f"好的，正在图谱网络中溯源【{author}】的生平与学术脉络...")
+
+        # 2. 查询 Neo4j
+        kg_results = get_author_profile(author)
+
+        if not kg_results:
+            dispatcher.utter_message(text=f"很遗憾，目前的知识图谱中尚未收录关于【{author}】的详细资料。")
+            # 同样需要清空槽位
+            return [SlotSet("author", None)]
+
+        # 3. 调用 Ollama
+        print(f"--- 提交给 LLM 的作者数据: {kg_results} ---") 
+        reply = generate_author_reply(author, kg_results)
+
+        # 4. 返回结果并清空槽位
+        dispatcher.utter_message(text=reply)
+
+        return [SlotSet("author", None)]

@@ -16,6 +16,7 @@ def get_books_by_topic(topic_name):
     RETURN DISTINCT b.title AS title, b.summary AS summary, b.rating AS rating
     ORDER BY b.rating DESC
     LIMIT 3
+
     """
     
     results = []
@@ -30,3 +31,40 @@ def get_books_by_topic(topic_name):
             
     driver.close()
     return results
+
+def get_author_profile(author_name):
+    print(f"-> 正在 Neo4j 中检索作者: {author_name}")
+    driver = GraphDatabase.driver(URI, auth=(USER, PASSWORD))
+    
+    # 核心 Cypher：同时获取作者基本信息、其著作，以及与其他作者的关联
+    cypher_query = """
+    MATCH (a:Author {name: $author})
+    // 该作者写的书
+    OPTIONAL MATCH (b:Book)-[:WRITTEN_BY]->(a)
+    // 该作者与其他作者的关系（不限方向）
+    OPTIONAL MATCH (a)-[r]-(related:Author)
+    
+    RETURN 
+        a.name AS name, 
+        a.primary_field AS field, 
+        a.bio AS bio,
+        collect(DISTINCT b.title) AS books,
+        collect(DISTINCT {relation_type: type(r), related_author: related.name}) AS connections
+    """
+    
+    profile = None
+    with driver.session() as session:
+        result = session.run(cypher_query, author=author_name)
+        record = result.single()
+        
+        if record and record["name"]:
+            profile = {
+                "姓名": record["name"],
+                "主要领域": record["field"],
+                "简介": record["bio"],
+                "馆藏著作": record["books"],
+                "学术/人物关联": record["connections"]
+            }
+            
+    driver.close()
+    return profile

@@ -8,6 +8,7 @@ intents:
 # 2. 实体：从用户话语中提取的关键参数
 entities:
   - topic
+  - author
 
 # 3. 槽位：用于在对话上下文中临时记住提取到的实体
 slots:
@@ -16,10 +17,16 @@ slots:
     mappings:
       - type: from_entity
         entity: topic
+  author:
+    type: text
+    mappings:
+      - type: from_entity
+        entity: author
 
 # 4. 动作：系统要执行的自定义逻辑代码
 actions:
   - action_recommend_by_topic
+  - action_introduce_author
 
 # 5. 固定回复：系统自带的简单文本回复
 responses:
