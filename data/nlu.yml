@@ -27,3 +27,10 @@ nlu:
       - [计算机科学](topic)类书籍
       - 找一本[科幻](topic)小说
       - 查询[计算机科学](topic)
+
+  - intent: introduce_author
+    examples: |
+      - 给我介绍一下[威廉·吉布森](author)
+      - [李航](author)是谁
+      - 我想了解[伊恩·古德费洛](author)的生平
+      - 查询作者[菲利普·迪克](author)

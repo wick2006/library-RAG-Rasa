@@ -10,3 +10,8 @@ rules:
     steps:
       - intent: recommend_by_topic
       - action: action_recommend_by_topic
+
+  - rule: 用户请求介绍作者时，触发查询动作
+    steps:
+      - intent: introduce_author
+      - action: action_introduce_author
