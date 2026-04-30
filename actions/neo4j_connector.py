@@ -33,15 +33,21 @@ def get_books_by_topic(topic_name):
     return results
 
 def get_author_profile(author_name):
-    print(f"-> 正在 Neo4j 中检索作者: {author_name}")
+    print(f"-> 正在 Neo4j 中检索作者: {author_name} (启用模糊匹配)")
     driver = GraphDatabase.driver(URI, auth=(USER, PASSWORD))
     
-    # 核心 Cypher：同时获取作者基本信息、其著作，以及与其他作者的关联
+    # 核心 Cypher 修改：使用 CONTAINS 进行模糊匹配，并忽略“·”号
     cypher_query = """
-    MATCH (a:Author {name: $author})
+    MATCH (a:Author)
+    // 匹配逻辑：
+    // 1. 图谱中的名字直接包含用户输入的词 (例如 "威廉·吉布森" 包含 "吉布森")
+    // 2. 或者去掉两边的“·”号后相互包含 (例如 "威廉吉布森" 包含 "威廉吉布森")
+    WHERE a.name CONTAINS $author 
+       OR replace(a.name, '·', '') CONTAINS replace($author, '·', '')
+    
     // 该作者写的书
     OPTIONAL MATCH (b:Book)-[:WRITTEN_BY]->(a)
-    // 该作者与其他作者的关系（不限方向）
+    // 该作者与其他作者的关系
     OPTIONAL MATCH (a)-[r]-(related:Author)
     
     RETURN 
@@ -50,11 +56,14 @@ def get_author_profile(author_name):
         a.bio AS bio,
         collect(DISTINCT b.title) AS books,
         collect(DISTINCT {relation_type: type(r), related_author: related.name}) AS connections
+    // 限制只返回最匹配的 1 个，防止返回多个同姓作者导致程序报错
+    LIMIT 1
     """
     
     profile = None
     with driver.session() as session:
         result = session.run(cypher_query, author=author_name)
+        # 使用 single() 获取匹配到的第一个作者记录
         record = result.single()
         
         if record and record["name"]:

@@ -9,18 +9,21 @@ def generate_ollama_reply(topic, kg_context):
     我从图书馆知识图谱中为你检索到了以下真实的书籍资料：
     {json.dumps(kg_context, ensure_ascii=False, indent=2)}
     
-    请根据以上资料，用自然、专业且友好的语气向用户推荐。
+    请根据以上资料，用自然、专业且友好的语气向用户推荐，不使用深度思考。
     要求：
     1. 必须基于提供的资料进行推荐，绝对不能虚构或编造图谱中没有的书籍。
     2. 顺便提一下书籍的作者，评分和亮点简介。
     3. 排版清晰，可以直接给用户阅读。
+    4. 使用txt文本进行回复，不要使用表情符号。
+    5. 重点：如果资料中提到了这些书籍之间的关联（如同一作者、同一系列等），请以“推荐理由”或“相关性”的形式巧妙地融入回答中，展现知识图谱的深度。
+    
     """
     
     url = "http://localhost:11434/api/generate"
     payload = {
-        "model": "qwen",  # 本地模型名称
+        "model": "qwen2.5:7b",  # 本地模型名称
         "prompt": prompt,
-        "stream": False
+        "stream": False #进行流式输出
     }
     
     try:
@@ -42,7 +45,7 @@ def generate_author_reply(author_name, kg_context):
     
     {json.dumps(kg_context, ensure_ascii=False, indent=2)}
     
-    请根据以上资料，为用户生成一段专业、生动的人物介绍。
+    请根据以上资料，为用户生成一段专业、生动的人物介绍，不使用深度思考。
     要求：
     1. 必须提及作者的主要研究领域和生平亮点。
     2. 如果该作者有馆藏著作，请顺带推荐。
@@ -54,7 +57,7 @@ def generate_author_reply(author_name, kg_context):
     payload = {
         "model": "qwen2.5:7b",
         "prompt": prompt,
-        "stream": False
+        "stream": False #进行流式输出
     }
     
     try:

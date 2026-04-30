@@ -35,7 +35,7 @@ class ActionRecommendByTopic(Action):
         # 3. 兜底逻辑：如果图谱里查不到这个方向的书
         if not kg_results:
             dispatcher.utter_message(text=f"很遗憾，我们馆内目前还没有关于【{topic}】方向的专门藏书，要不换个方向试试？")
-            return []
+            return [SlotSet("topic", None)]
 
         # 4. 如果查到了数据，交给 Ollama 生成自然语言回复
         print(f"--- 准备提交给 LLM 的数据: {kg_results} ---") 
